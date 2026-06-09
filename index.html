@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>微改通 · 数据可视化大屏</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;background:#070B13;color:#E0E6ED}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(59,130,246,0.08),transparent 60%),radial-gradient(ellipse 40% 30% at 80% 90%,rgba(99,102,241,0.06),transparent 50%);pointer-events:none;z-index:0}
+.header{background:rgba(7,11,19,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(59,130,246,0.12);padding:16px 36px;position:sticky;top:0;z-index:90;display:flex;align-items:center}
+.header h1{font-size:22px;font-weight:800;color:#E0E6ED;letter-spacing:.5px}
+.header h1 span{background:linear-gradient(135deg,#3B82F6,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .time{font-size:13px;color:#475569;margin-left:auto;margin-right:24px;font-family:"JetBrains Mono","Fira Code",monospace}
+
+.tabs{display:flex;gap:8px;background:rgba(15,23,42,0.8);border-radius:14px;padding:5px;border:1px solid rgba(59,130,246,0.15);flex-shrink:0}
+.tab{padding:11px 28px;border-radius:10px;font-size:14px;font-weight:700;color:#64748B;cursor:pointer;border:none;background:transparent;transition:all .25s}
+.tab:hover{color:#94A3B8;background:rgba(255,255,255,0.02)}
+.tab.active{background:rgba(59,130,246,0.2);color:#93C5FD;box-shadow:0 0 18px rgba(59,130,246,0.12)}
+
+.container{max-width:100%;margin:0 auto;padding:24px 36px 32px;position:relative;z-index:1}
+.page{display:none}.page.active{display:block}
+
+.kpi-row{display:flex;gap:16px;margin-bottom:24px}
+.kpi-card{flex:1;background:linear-gradient(160deg,rgba(15,23,42,0.98),rgba(20,28,48,0.92));border:1px solid rgba(59,130,246,0.08);border-radius:18px;padding:18px 24px;position:relative;overflow:hidden;transition:all .3s;cursor:default}
+.kpi-card:hover{transform:translateY(-2px);border-color:rgba(59,130,246,0.25);box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 40px rgba(59,130,246,0.06)}
+.kpi-card::before{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);transition:all .4s}
+.kpi-card:hover::before{left:5%;right:5%}
+.kpi-card .label{font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:2px}
+.kpi-card .value{font-size:36px;font-weight:900;color:#F1F5F9;margin:4px 0 0;letter-spacing:-1px}
+.kpi-card .sub{font-size:12px;color:#60A5FA;font-weight:600}
+.kpi-card .sub.down{color:#F87171}
+.kpi-card .glow{position:absolute;top:-60%;right:-30%;width:150px;height:150px;border-radius:50%;background:radial-gradient(rgba(59,130,246,0.08),transparent);pointer-events:none;transition:all .5s}
+.kpi-card:hover .glow{transform:scale(1.4)}
+
+.chart-grid{display:flex;gap:24px;margin-bottom:28px;min-height:62vh}
+.chart-panel{background:linear-gradient(160deg,rgba(15,23,42,0.98),rgba(20,28,48,0.92));border:1px solid rgba(59,130,246,0.08);border-radius:18px;padding:16px 20px 12px;overflow:hidden;position:relative;display:flex;flex-direction:column;transition:all .3s}
+.chart-panel:hover{border-color:rgba(59,130,246,0.2);box-shadow:0 6px 28px rgba(0,0,0,0.35)}
+.chart-panel::before{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.25),transparent)}
+.chart-panel .title{font-size:13px;font-weight:700;color:#94A3B8;margin-bottom:8px;flex-shrink:0}
+.chart-main{flex:3}.chart-main .chart-inner{flex:1;width:100%}
+.chart-side{flex:2;display:flex;flex-direction:column;gap:24px}
+.chart-side .chart-panel{flex:1}
+.chart-side .chart-inner{flex:1;width:100%}
+
+.chart-full{background:linear-gradient(160deg,rgba(15,23,42,0.98),rgba(20,28,48,0.92));border:1px solid rgba(59,130,246,0.08);border-radius:18px;padding:22px;margin-bottom:24px}
+.chart-full::before{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.25),transparent)}
+.chart-full:hover{border-color:rgba(59,130,246,0.2);box-shadow:0 6px 28px rgba(0,0,0,0.35)}
+.chart-full .title{font-size:13px;font-weight:700;color:#94A3B8;margin-bottom:20px}
+
+.risk-table{width:100%;border-collapse:collapse}
+.risk-table th{text-align:left;padding:14px 20px;font-size:11px;font-weight:700;color:#475569;border-bottom:1px solid rgba(59,130,246,0.08);text-transform:uppercase;letter-spacing:1px}
+.risk-table td{padding:16px 20px;font-size:13px;color:#CBD5E1;border-bottom:1px solid rgba(255,255,255,0.02)}
+.risk-table tr:hover td{background:rgba(59,130,246,0.04)}
+.tag{padding:4px 14px;border-radius:999px;font-size:11px;font-weight:700}
+.tag-high{background:rgba(239,68,68,0.15);color:#FCA5A5;border:1px solid rgba(239,68,68,0.2)}
+.tag-mid{background:rgba(245,158,11,0.15);color:#FCD34D;border:1px solid rgba(245,158,11,0.2)}
+.tag-low{background:rgba(96,165,250,0.15);color:#93C5FD;border:1px solid rgba(96,165,250,0.2)}
+
+.ent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.ent-card{background:linear-gradient(160deg,rgba(15,23,42,0.98),rgba(20,28,48,0.92));border:1px solid rgba(59,130,246,0.08);border-radius:18px;padding:22px 18px;text-align:center;transition:all .3s}
+.ent-card:hover{transform:translateY(-2px);border-color:rgba(59,130,246,0.25);box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.ent-card::before{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.25),transparent)}
+.ent-card .name{font-size:14px;font-weight:700;color:#E2E8F0;margin-bottom:14px}
+.ent-card .score{font-size:42px;font-weight:900;color:#60A5FA;letter-spacing:-1px}
+.ent-card .meta{font-size:11px;color:#475569;margin-top:4px}
+.ent-card .bar-row{display:flex;justify-content:space-between;font-size:11px;color:#64748B;margin-top:12px;font-weight:600}
+.ent-card .bar-bg{height:5px;background:rgba(255,255,255,0.04);border-radius:3px;margin-top:6px;overflow:hidden}
+.ent-card .bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#2563EB,#6366F1)}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>微改通 · <span>数据可视化大屏</span></h1>
+  <span class="time" id="clock"></span>
+  <div class="tabs">
+    <button class="tab active" onclick="switchPage(0)">总览</button>
+    <button class="tab" onclick="switchPage(1)">企业 &amp; 风险</button>
+  </div>
+</div>
+<div class="container">
+<div class="page active" id="page0">
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="glow"></div><div class="label">项目总数</div><div class="value">256</div><div class="sub">↑ 12.5% 较上月</div></div>
+    <div class="kpi-card"><div class="glow"></div><div class="label">进行中</div><div class="value">43</div><div class="sub">覆盖 28 个小区</div></div>
+    <div class="kpi-card"><div class="glow"></div><div class="label">总金额</div><div class="value">1,258<span style="font-size:15px;color:#475569"> 万元</span></div><div class="sub">使用率 70.9%</div></div>
+    <div class="kpi-card"><div class="glow"></div><div class="label">满意度</div><div class="value">87.5<span style="font-size:15px;color:#475569">%</span></div><div class="sub down">↓ 2.1% 较上季度</div></div>
+    <div class="kpi-card"><div class="glow"></div><div class="label">入驻企业</div><div class="value">82</div><div class="sub">AAA 级 12 家</div></div>
+    <div class="kpi-card"><div class="glow"></div><div class="label">覆盖居民</div><div class="value">3,560</div><div class="sub">活跃率 68%</div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-panel chart-main"><div class="title">需求热力分布图 · 各小区项目密度</div><div class="chart-inner" id="heatmap"></div></div>
+    <div class="chart-side">
+      <div class="chart-panel"><div class="title">资金流向桑基图</div><div class="chart-inner" id="sankey"></div></div>
+      <div class="chart-panel"><div class="title">满意度趋势 · 近12个月</div><div class="chart-inner" id="trend"></div></div>
+    </div>
+  </div>
+</div>
+<div class="page" id="page1">
+  <div class="chart-full"><div class="title">企业信用画像</div>
+    <div class="ent-grid">
+      <div class="ent-card"><div class="name">盛世景观</div><div class="score">96</div><div class="meta">AAA · 48个项目 · 评分 4.8</div><div class="bar-row"><span>履约率</span><span>98%</span></div><div class="bar-bg"><div class="bar-fill" style="width:98%"></div></div><div class="bar-row" style="margin-top:10px"><span>响应速度</span><span>92%</span></div><div class="bar-bg"><div class="bar-fill" style="width:92%"></div></div></div>
+      <div class="ent-card"><div class="name">华昇科技</div><div class="score">93</div><div class="meta">AAA · 31个项目 · 评分 4.9</div><div class="bar-row"><span>履约率</span><span>95%</span></div><div class="bar-bg"><div class="bar-fill" style="width:95%"></div></div><div class="bar-row" style="margin-top:10px"><span>响应速度</span><span>88%</span></div><div class="bar-bg"><div class="bar-fill" style="width:88%"></div></div></div>
+      <div class="ent-card"><div class="name">万科服务</div><div class="score">88</div><div class="meta">AA · 62个项目 · 评分 4.6</div><div class="bar-row"><span>履约率</span><span>90%</span></div><div class="bar-bg"><div class="bar-fill" style="width:90%"></div></div><div class="bar-row" style="margin-top:10px"><span>响应速度</span><span>85%</span></div><div class="bar-bg"><div class="bar-fill" style="width:85%"></div></div></div>
+      <div class="ent-card"><div class="name">绿源市政</div><div class="score">84</div><div class="meta">AA · 55个项目 · 评分 4.5</div><div class="bar-row"><span>履约率</span><span>87%</span></div><div class="bar-bg"><div class="bar-fill" style="width:87%"></div></div><div class="bar-row" style="margin-top:10px"><span>响应速度</span><span>80%</span></div><div class="bar-bg"><div class="bar-fill" style="width:80%"></div></div></div>
+    </div>
+  </div>
+  <div class="chart-full"><div class="title">风险预警仪表盘</div>
+    <table class="risk-table">
+      <thead><tr><th>类型</th><th>描述</th><th>级别</th><th>时间</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>资金异常</td><td>蓝湾车棚项目支出超出预算 15%</td><td><span class="tag tag-high">高风险</span></td><td>2026-06-05</td><td style="color:#FCA5A5;font-weight:600">待处理</td></tr>
+        <tr><td>投诉激增</td><td>长青社区本周投诉量环比增长 +300%</td><td><span class="tag tag-high">高风险</span></td><td>2026-06-04</td><td style="color:#FCD34D;font-weight:600">处理中</td></tr>
+        <tr><td>项目超期</td><td>智能监控系统项目已超期 12 天</td><td><span class="tag tag-mid">中风险</span></td><td>2026-06-03</td><td style="color:#FCD34D;font-weight:600">已督办</td></tr>
+        <tr><td>资金延迟</td><td>适老化扶手改造进度款超 7 天未释放</td><td><span class="tag tag-mid">中风险</span></td><td>2026-06-02</td><td style="color:#93C5FD;font-weight:600">待确认</td></tr>
+        <tr><td>企业活跃</td><td>某入驻企业连续 3 个招标周期未参与投标</td><td><span class="tag tag-low">低风险</span></td><td>2026-06-01</td><td style="color:#64748B;font-weight:600">观察中</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script>
+function switchPage(n){
+  document.querySelectorAll('.page').forEach((p,i)=>p.classList.toggle('active',i===n));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+  if(n===0)setTimeout(()=>{hc&&hc.resize();sc&&sc.resize();tc&&tc.resize()},150);
+}
+document.getElementById('clock').textContent=new Date().toLocaleString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
+
+var D='transparent',GL='rgba(59,130,246,0.05)',T={backgroundColor:'rgba(12,20,36,.98)',borderColor:'rgba(59,130,246,.25)',textStyle:{color:'#CBD5E1'}};
+var hc=echarts.init(document.getElementById('heatmap'));
+var hW=document.getElementById('heatmap').offsetWidth||700;
+var hH=document.getElementById('heatmap').offsetHeight||440;
+hc.setOption({backgroundColor:D,tooltip:T,grid:{left:72,right:16,top:8,bottom:40},xAxis:{type:'category',data:['长青社区','蓝湾小区','新华苑','虹桥街道','翠湖社区','阳光里','龙腾社区','金地花园'],axisLabel:{fontSize:10,color:'#6B7280',fontWeight:600},axisLine:{lineStyle:{color:GL}}},yAxis:{type:'category',data:['公共改造','设施维修','环境提升','适老化','智慧设施'],axisLabel:{fontSize:10,color:'#6B7280',fontWeight:600}},visualMap:{min:0,max:25,calculable:!0,orient:'vertical',right:8,top:16,bottom:16,textStyle:{color:'#6B7280',fontWeight:600},inRange:{color:['rgba(30,64,175,.1)','rgba(37,99,235,.3)','#2563EB','#1D4ED8']}},series:[{type:'heatmap',data:[[0,0,18],[0,1,12],[0,2,8],[1,0,22],[1,1,15],[1,3,10],[2,0,8],[2,2,14],[2,4,6],[3,3,20],[3,1,11],[4,0,7],[4,4,9],[5,2,16],[5,1,13],[6,0,5],[6,3,8],[7,1,19],[7,2,12]],label:{show:!0,fontSize:11,color:'#94A3B8',fontWeight:700},emphasis:{itemStyle:{shadowBlur:18,shadowColor:'rgba(37,99,235,.6)'}}}]});
+
+var sc=echarts.init(document.getElementById('sankey'));
+sc.setOption({backgroundColor:D,tooltip:{trigger:'item',...T},series:[{type:'sankey',layout:'none',emphasis:{focus:'adjacency'},nodeAlign:'left',nodeWidth:18,nodeGap:14,data:[{name:'政府拨款',itemStyle:{color:'#2563EB'}},{name:'企业投资',itemStyle:{color:'#4F46E5'}},{name:'居民自筹',itemStyle:{color:'#7C3AED'}},{name:'公益基金',itemStyle:{color:'#A78BFA'}},{name:'公共改造',itemStyle:{color:'#1D4ED8'}},{name:'设施维修',itemStyle:{color:'#3730A3'}},{name:'环境提升',itemStyle:{color:'#1E40AF'}},{name:'适老化',itemStyle:{color:'#5B21B6'}},{name:'已完成',itemStyle:{color:'#60A5FA'}},{name:'进行中',itemStyle:{color:'#818CF8'}}],links:[{source:'政府拨款',target:'公共改造',value:285},{source:'政府拨款',target:'环境提升',value:120},{source:'政府拨款',target:'适老化',value:85},{source:'企业投资',target:'设施维修',value:142},{source:'企业投资',target:'公共改造',value:95},{source:'居民自筹',target:'设施维修',value:58},{source:'居民自筹',target:'适老化',value:40},{source:'公益基金',target:'环境提升',value:32},{source:'公共改造',target:'已完成',value:320},{source:'公共改造',target:'进行中',value:60},{source:'设施维修',target:'已完成',value:180},{source:'设施维修',target:'进行中',value:20},{source:'环境提升',target:'已完成',value:130},{source:'环境提升',target:'进行中',value:22},{source:'适老化',target:'已完成',value:100},{source:'适老化',target:'进行中',value:25}],label:{fontSize:10,color:'#94A3B8',fontWeight:600},lineStyle:{color:'gradient',curveness:.5}}]});
+
+var tc=echarts.init(document.getElementById('trend'));
+tc.setOption({backgroundColor:D,tooltip:{trigger:'axis',...T},grid:{left:40,right:18,top:12,bottom:28},xAxis:{type:'category',data:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],axisLabel:{fontSize:9,color:'#6B7280',fontWeight:600},axisLine:{lineStyle:{color:GL}}},yAxis:{type:'value',min:65,max:95,axisLabel:{fontSize:9,color:'#6B7280',fontWeight:600},splitLine:{lineStyle:{color:GL}}},series:[{data:[75,73,78,80,82,79,83,85,87,84,89,91],type:'line',smooth:!0,symbol:'circle',symbolSize:4,lineStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#3B82F6'},{offset:1,color:'#6366F1'}]),width:2.2,shadowBlur:8,shadowColor:'rgba(59,130,246,.3)'},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(59,130,246,.2)'},{offset:1,color:'rgba(59,130,246,0)'}])}}]});
+
+window.addEventListener('resize',()=>{hc.resize();sc.resize();tc.resize();});
+</script>
+</body>
+</html>
